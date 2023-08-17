@@ -165,7 +165,8 @@ final class DataSerializableSerializer implements StreamSerializer<DataSerializa
             }
 
             ds.readData(in);
-            return ds;
+            throw new RuntimeException("na m8");
+            // return ds;
         } catch (Exception e) {
             e = tryClarifyNoSuchMethodException(in.getClassLoader(), className, e);
             throw rethrowReadException(id, factoryId, className, e);
@@ -183,8 +184,9 @@ final class DataSerializableSerializer implements StreamSerializer<DataSerializa
         if (e instanceof HazelcastSerializationException) {
             throw (HazelcastSerializationException) e;
         }
+
         throw new HazelcastSerializationException("Problem while reading DataSerializable, namespace: "
-                + factoryId
+                + FactoryIdHelper.getName(factoryId)
                 + ", ID: " + id
                 + ", class: '" + className + "'"
                 + ", exception: " + e.getMessage(), e);

@@ -16,9 +16,15 @@
 
 package com.hazelcast.internal.serialization.impl;
 
+import com.hazelcast.logging.ILogger;
 import com.hazelcast.logging.Logger;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
 public final class FactoryIdHelper {
+    private static final ILogger LOGGER = Logger.getLogger(FactoryIdHelper.class);
 
     public static final String SPI_DS_FACTORY = "hazelcast.serialization.ds.spi";
     public static final int SPI_DS_FACTORY_ID = -1;
@@ -160,15 +166,33 @@ public final class FactoryIdHelper {
     private FactoryIdHelper() {
     }
 
-    public static int getFactoryId(String prop, int defaultId) {
+    public static int getFactoryId(final String prop, final int defaultId) {
         final String value = System.getProperty(prop);
         if (value != null) {
             try {
                 return Integer.parseInt(value);
-            } catch (NumberFormatException e) {
-                Logger.getLogger(FactoryIdHelper.class).finest("Parameter for property prop could not be parsed", e);
+            } catch (final NumberFormatException e) {
+                LOGGER.finest("Parameter for property prop could not be parsed", e);
             }
         }
         return defaultId;
+    }
+
+    /**
+     * @return the name of the ID variable with a corresponding {@code FACTORY_ID} <br>
+     *         E.G. for {@value #SCHEDULED_EXECUTOR_DS_FACTORY_ID}, {@link #SCHEDULED_EXECUTOR_DS_FACTORY_ID} is returned
+     * 
+     * @see <a href="https://github.com/hazelcast/hazelcast/pull/25247">Discussion over implementing this by adjusting the
+     *      object model or using reflection</a>
+     */
+    public static String getName(final int id) {
+        return Arrays.stream(FactoryIdHelper.class.getDeclaredFields()).filter(field -> {
+            try {
+                return Modifier.isStatic(field.getModifiers()) && (field.getType() == int.class) && (field.getInt(null) == id);
+            } catch (final ReflectiveOperationException e) {
+                LOGGER.fine("Unable to access field", e);
+                return false;
+            }
+        }).map(Field::getName).findAny().orElseGet(() -> String.valueOf(id));
     }
 }
