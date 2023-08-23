@@ -60,5 +60,9 @@ public class FactoryIdHelperTest extends HazelcastTestSupport {
         assertEquals(10, factoryId);
     }
 
-
+    @Test
+    public void testGetName() throws Exception {
+        assertEquals("SCHEDULED_EXECUTOR_DS_FACTORY_ID",
+                FactoryIdHelper.getName(FactoryIdHelper.SCHEDULED_EXECUTOR_DS_FACTORY_ID));
+    }
 }

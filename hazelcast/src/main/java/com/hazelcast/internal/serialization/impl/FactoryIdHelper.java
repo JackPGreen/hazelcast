@@ -181,7 +181,7 @@ public final class FactoryIdHelper {
     /**
      * @return the name of the ID variable with a corresponding {@code FACTORY_ID} <br>
      *         E.G. for {@value #SCHEDULED_EXECUTOR_DS_FACTORY_ID}, {@link #SCHEDULED_EXECUTOR_DS_FACTORY_ID} is returned
-     * 
+     *
      * @see <a href="https://github.com/hazelcast/hazelcast/pull/25247">Discussion over implementing this by adjusting the
      *      object model or using reflection</a>
      */
