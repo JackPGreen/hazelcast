@@ -165,8 +165,7 @@ final class DataSerializableSerializer implements StreamSerializer<DataSerializa
             }
 
             ds.readData(in);
-            throw new RuntimeException("na m8");
-            // return ds;
+            return ds;
         } catch (Exception e) {
             e = tryClarifyNoSuchMethodException(in.getClassLoader(), className, e);
             throw rethrowReadException(id, factoryId, className, e);
