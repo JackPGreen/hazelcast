@@ -26,7 +26,11 @@ import com.hazelcast.internal.metrics.Probe;
 import com.hazelcast.internal.metrics.ProbeFunction;
 import com.hazelcast.internal.util.counters.Counter;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodHandles.Lookup;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
@@ -35,33 +39,40 @@ import java.util.concurrent.Semaphore;
  * A FieldProbe is a {@link ProbeFunction} that reads out a field that is annotated with {@link Probe}.
  */
 abstract class FieldProbe implements ProbeFunction {
+    // TODO Move this + other shared MethodProbe code into ProbeFunction?
+    private static final Lookup LOOKUP = MethodHandles.lookup();
 
+    final VarHandle varHandle;
+    final boolean isFieldStatic;
     final CachedProbe probe;
-    final Field field;
     final ProbeType type;
     final SourceMetadata sourceMetadata;
     final String probeName;
 
-    FieldProbe(Field field, Probe probe, ProbeType type, SourceMetadata sourceMetadata) {
-        this.field = field;
-        this.probe = new CachedProbe(probe);
-        this.type = type;
-        this.sourceMetadata = sourceMetadata;
-        this.probeName = probe.name();
-        assert probeName != null;
-        assert probeName.length() > 0;
-        field.setAccessible(true);
+    FieldProbe(final Field field, final Probe probe, final ProbeType type, final SourceMetadata sourceMetadata) {
+        try {
+            varHandle = MethodHandles.privateLookupIn(field.getDeclaringClass(), LOOKUP).unreflectVarHandle(field);
+
+            isFieldStatic = Modifier.isStatic(field.getModifiers());
+
+            this.probe = new CachedProbe(probe);
+            this.type = type;
+            this.sourceMetadata = sourceMetadata;
+            probeName = probe.name();
+            assert probeName != null;
+            assert probeName.length() > 0;
+        } catch (final ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    void register(MetricsRegistryImpl metricsRegistry, Object source, String namePrefix) {
-        MetricDescriptor descriptor = metricsRegistry
-                .newMetricDescriptor()
-                .withPrefix(namePrefix)
+    void register(final MetricsRegistryImpl metricsRegistry, final Object source, final String namePrefix) {
+        final MetricDescriptor descriptor = metricsRegistry.newMetricDescriptor().withPrefix(namePrefix)
                 .withMetric(getProbeName());
         metricsRegistry.registerInternal(source, descriptor, probe.level(), this);
     }
 
-    void register(MetricsRegistryImpl metricsRegistry, MetricDescriptor descriptor, Object source) {
+    void register(final MetricsRegistryImpl metricsRegistry, final MetricDescriptor descriptor, final Object source) {
         metricsRegistry.registerStaticProbe(source, descriptor, getProbeName(), probe.level(), probe.unit(), this);
     }
 
@@ -69,8 +80,8 @@ abstract class FieldProbe implements ProbeFunction {
         return probeName;
     }
 
-    static <S> FieldProbe createFieldProbe(Field field, Probe probe, SourceMetadata sourceMetadata) {
-        ProbeType type = getType(field.getType());
+    static <S> FieldProbe createFieldProbe(final Field field, final Probe probe, final SourceMetadata sourceMetadata) {
+        final ProbeType type = getType(field.getType());
         if (type == null) {
             throw new IllegalArgumentException(format("@Probe field '%s' is of an unhandled type", field));
         }
@@ -86,29 +97,29 @@ abstract class FieldProbe implements ProbeFunction {
 
     static class LongFieldProbe<S> extends FieldProbe implements LongProbeFunction<S> {
 
-        LongFieldProbe(Field field, Probe probe, ProbeType type, SourceMetadata sourceMetadata) {
+        LongFieldProbe(final Field field, final Probe probe, final ProbeType type, final SourceMetadata sourceMetadata) {
             super(field, probe, type, sourceMetadata);
         }
 
         @Override
-        public long get(S source) throws Exception {
+        public long get(final S source) throws Exception {
             switch (type) {
                 case TYPE_LONG_PRIMITIVE:
-                    return field.getLong(source);
+                    return isFieldStatic ? (long) varHandle.get() : (long) varHandle.get(source);
                 case TYPE_LONG_NUMBER:
-                    Number longNumber = (Number) field.get(source);
+                    final Number longNumber = (Number) getFromField(source);
                     return longNumber == null ? 0 : longNumber.longValue();
                 case TYPE_MAP:
-                    Map<?, ?> map = (Map<?, ?>) field.get(source);
+                    final Map<?, ?> map = (Map<?, ?>) getFromField(source);
                     return map == null ? 0 : map.size();
                 case TYPE_COLLECTION:
-                    Collection<?> collection = (Collection<?>) field.get(source);
+                    final Collection<?> collection = (Collection<?>) getFromField(source);
                     return collection == null ? 0 : collection.size();
                 case TYPE_COUNTER:
-                    Counter counter = (Counter) field.get(source);
+                    final Counter counter = (Counter) getFromField(source);
                     return counter == null ? 0 : counter.get();
                 case TYPE_SEMAPHORE:
-                    Semaphore semaphore = (Semaphore) field.get(source);
+                    final Semaphore semaphore = (Semaphore) getFromField(source);
                     return semaphore == null ? 0 : semaphore.availablePermits();
                 default:
                     throw new IllegalStateException("Unhandled type:" + type);
@@ -118,21 +129,25 @@ abstract class FieldProbe implements ProbeFunction {
 
     static class DoubleFieldProbe<S> extends FieldProbe implements DoubleProbeFunction<S> {
 
-        DoubleFieldProbe(Field field, Probe probe, ProbeType type, SourceMetadata sourceMetadata) {
+        DoubleFieldProbe(final Field field, final Probe probe, final ProbeType type, final SourceMetadata sourceMetadata) {
             super(field, probe, type, sourceMetadata);
         }
 
         @Override
-        public double get(S source) throws Exception {
+        public double get(final S source) throws Exception {
             switch (type) {
                 case TYPE_DOUBLE_PRIMITIVE:
-                    return field.getDouble(source);
+                    return isFieldStatic ? (double) varHandle.get() : (double) varHandle.get(source);
                 case TYPE_DOUBLE_NUMBER:
-                    Number doubleNumber = (Number) field.get(source);
+                    final Number doubleNumber = (Number) getFromField(source);
                     return doubleNumber == null ? 0 : doubleNumber.doubleValue();
                 default:
                     throw new IllegalStateException("Unhandled type:" + type);
             }
         }
+    }
+
+    protected <T> T getFromField(final Object source) {
+        return isFieldStatic ? (T) varHandle.get() : (T) varHandle.get(source);
     }
 }
