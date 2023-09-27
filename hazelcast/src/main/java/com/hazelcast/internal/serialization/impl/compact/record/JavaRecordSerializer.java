@@ -22,12 +22,17 @@ import com.hazelcast.internal.serialization.impl.compact.DefaultCompactReader;
 import com.hazelcast.internal.serialization.impl.compact.Schema;
 import com.hazelcast.internal.serialization.impl.compact.zeroconfig.ValueReaderWriter;
 import com.hazelcast.internal.serialization.impl.compact.zeroconfig.ValueReaderWriters;
+import com.hazelcast.internal.util.ExceptionUtil;
 import com.hazelcast.nio.serialization.HazelcastSerializationException;
 import com.hazelcast.nio.serialization.compact.CompactReader;
 import com.hazelcast.nio.serialization.compact.CompactSerializer;
 import com.hazelcast.nio.serialization.compact.CompactWriter;
 
 import javax.annotation.Nonnull;
+
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
@@ -36,46 +41,52 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Objects.requireNonNull;
 
+// TODO is there any tests for *any* of this...?!
 @SuppressWarnings("checkstyle:executablestatementcount")
 public class JavaRecordSerializer implements CompactSerializer<Object> {
+    private static final Lookup LOOKUP = MethodHandles.lookup();
 
-    private final Method isRecordMethod;
-    private final Method getRecordComponentsMethod;
-    private final Method getTypeMethod;
-    private final Method getNameMethod;
-    private final Method getGenericTypeMethod;
+    private static final MethodHandle isRecordMethod;
+    private static final MethodHandle getRecordComponentsMethod;
+    private static final MethodHandle getTypeMethod;
+    private static final MethodHandle getNameMethod;
+    private static final MethodHandle getGenericTypeMethod;
     private final CompactStreamSerializer compactStreamSerializer;
     private final Map<Class<?>, JavaRecordReader> readersCache = new ConcurrentHashMap<>();
     private final Map<Class<?>, ComponentReaderWriter[]> readerWritersCache = new ConcurrentHashMap<>();
+    
+    static {
+        MethodHandle isRecordMethodLocal;
+        MethodHandle getRecordComponentsMethodLocal;
+        MethodHandle getTypeMethodLocal;
+        MethodHandle getNameMethodLocal;
+        MethodHandle getGenericTypeMethodLocal;
+
+        try {
+            isRecordMethodLocal = LOOKUP.unreflect(Class.class.getMethod("isRecord"));
+            getRecordComponentsMethodLocal = LOOKUP.unreflect(Class.class.getMethod("getRecordComponents"));
+
+            Class<?> recordComponentClass = Class.forName("java.lang.reflect.RecordComponent");
+            getTypeMethodLocal = LOOKUP.unreflect(recordComponentClass.getMethod("getType"));
+            getNameMethodLocal = LOOKUP.unreflect(recordComponentClass.getMethod("getName"));
+            getGenericTypeMethodLocal = LOOKUP.unreflect(recordComponentClass.getMethod("getGenericType"));
+        } catch (Throwable t) {
+            isRecordMethodLocal = null;
+            getRecordComponentsMethodLocal = null;
+            getTypeMethodLocal = null;
+            getNameMethodLocal = null;
+            getGenericTypeMethodLocal = null;
+        }
+
+        isRecordMethod = isRecordMethodLocal;
+        getRecordComponentsMethod = getRecordComponentsMethodLocal;
+        getTypeMethod = getTypeMethodLocal;
+        getNameMethod = getNameMethodLocal;
+        getGenericTypeMethod = getGenericTypeMethodLocal;
+    }
 
     public JavaRecordSerializer(CompactStreamSerializer compactStreamSerializer) {
         this.compactStreamSerializer = compactStreamSerializer;
-        Method isRecordMethod;
-        Method getRecordComponentsMethod;
-        Method getTypeMethod;
-        Method getNameMethod;
-        Method getGenericTypeMethod;
-
-        try {
-            isRecordMethod = Class.class.getMethod("isRecord");
-            getRecordComponentsMethod = Class.class.getMethod("getRecordComponents");
-            Class<?> recordComponentClass = Class.forName("java.lang.reflect.RecordComponent");
-            getTypeMethod = recordComponentClass.getMethod("getType");
-            getNameMethod = recordComponentClass.getMethod("getName");
-            getGenericTypeMethod = recordComponentClass.getMethod("getGenericType");
-        } catch (Throwable t) {
-            isRecordMethod = null;
-            getRecordComponentsMethod = null;
-            getTypeMethod = null;
-            getNameMethod = null;
-            getGenericTypeMethod = null;
-        }
-
-        this.isRecordMethod = isRecordMethod;
-        this.getRecordComponentsMethod = getRecordComponentsMethod;
-        this.getTypeMethod = getTypeMethod;
-        this.getNameMethod = getNameMethod;
-        this.getGenericTypeMethod = getGenericTypeMethod;
     }
 
     public boolean isRecord(Class<?> clazz) {
@@ -157,7 +168,7 @@ public class JavaRecordSerializer implements CompactSerializer<Object> {
                 componentGetter.setAccessible(true);
                 componentReaderWriters[i] = new ComponentReaderWriterAdapter(
                         ValueReaderWriters.readerWriterFor(compactStreamSerializer, clazz, type, genericType, name),
-                        componentGetter
+                        LOOKUP.unreflect(componentGetter)
                 );
             }
 
@@ -167,17 +178,17 @@ public class JavaRecordSerializer implements CompactSerializer<Object> {
             JavaRecordReader recordReader = new JavaRecordReader(constructor, componentReaderWriters);
             readersCache.put(clazz, recordReader);
             readerWritersCache.put(clazz, componentReaderWriters);
-        } catch (Exception e) {
-            throw new HazelcastSerializationException("Failed to construct the readers/writers for the Java record", e);
+        } catch (Throwable t) {
+            throw new HazelcastSerializationException("Failed to construct the readers/writers for the Java record", t);
         }
     }
 
     private static final class ComponentReaderWriterAdapter implements ComponentReaderWriter {
 
         private final ValueReaderWriter readerWriter;
-        private final Method componentGetter;
+        private final MethodHandle componentGetter;
 
-        private ComponentReaderWriterAdapter(ValueReaderWriter readerWriter, Method componentGetter) {
+        private ComponentReaderWriterAdapter(ValueReaderWriter readerWriter, MethodHandle componentGetter) {
             this.readerWriter = readerWriter;
             this.componentGetter = componentGetter;
         }
@@ -189,7 +200,13 @@ public class JavaRecordSerializer implements CompactSerializer<Object> {
 
         @Override
         public void writeComponent(CompactWriter compactWriter, Object recordObject) throws Exception {
-            readerWriter.write(compactWriter, componentGetter.invoke(recordObject));
+            try {
+                readerWriter.write(compactWriter, componentGetter.invoke(recordObject));
+            } catch (Exception e) {
+                throw e;
+            } catch (Throwable t) {
+                ExceptionUtil.sneakyThrow(t);
+            }
         }
     }
 }

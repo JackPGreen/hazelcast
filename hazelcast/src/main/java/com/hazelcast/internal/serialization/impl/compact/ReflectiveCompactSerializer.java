@@ -24,6 +24,10 @@ import com.hazelcast.nio.serialization.compact.CompactSerializer;
 import com.hazelcast.nio.serialization.compact.CompactWriter;
 
 import javax.annotation.Nonnull;
+
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodHandles.Lookup;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
@@ -65,6 +69,7 @@ import static java.util.stream.Collectors.toList;
  * HazelcastSerializationException.
  */
 public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
+    private static final Lookup LOOKUP = MethodHandles.lookup();
 
     private final Map<Class, ReaderWriter[]> readerWritersCache = new ConcurrentHashMap<>();
     private final CompactStreamSerializer compactStreamSerializer;
@@ -166,6 +171,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
     }
 
     private void createFastReadWriteCaches(Class clazz) {
+        
         // The top level class might not be Compact serializable
         CompactUtil.verifyClassIsCompactSerializable(clazz);
 
@@ -176,6 +182,15 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
         int index = 0;
         for (Field field : allFields) {
             field.setAccessible(true);
+
+            final VarHandle varHandle;
+
+            try {
+                varHandle = MethodHandles.privateLookupIn(clazz, LOOKUP).unreflectVarHandle(field);
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException(e);
+            }
+
             Class<?> type = field.getType();
             String name = field.getName();
 
@@ -186,7 +201,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
                     @Override
                     public void read(CompactReader reader, Schema schema, Object o) throws Exception {
                         if (isFieldExist(schema, name, INT8, NULLABLE_INT8)) {
-                            field.setByte(o, reader.readInt8(name));
+                            varHandle.set(o, reader.readInt8(name));
                         }
                     }
 
@@ -200,7 +215,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
                     @Override
                     public void read(CompactReader reader, Schema schema, Object o) throws Exception {
                         if (isFieldExist(schema, name, INT16, NULLABLE_INT16)) {
-                            field.setChar(o, (char) reader.readInt16(name));
+                            varHandle.set(o, (char) reader.readInt16(name));
                         }
                     }
 
@@ -214,7 +229,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
                     @Override
                     public void read(CompactReader reader, Schema schema, Object o) throws Exception {
                         if (isFieldExist(schema, name, INT16, NULLABLE_INT16)) {
-                            field.setShort(o, reader.readInt16(name));
+                            varHandle.set(o, reader.readInt16(name));
                         }
                     }
 
@@ -228,7 +243,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
                     @Override
                     public void read(CompactReader reader, Schema schema, Object o) throws Exception {
                         if (isFieldExist(schema, name, INT32, NULLABLE_INT32)) {
-                            field.setInt(o, reader.readInt32(name));
+                            varHandle.set(o, reader.readInt32(name));
                         }
                     }
 
@@ -242,7 +257,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
                     @Override
                     public void read(CompactReader reader, Schema schema, Object o) throws Exception {
                         if (isFieldExist(schema, name, INT64, NULLABLE_INT64)) {
-                            field.setLong(o, reader.readInt64(name));
+                            varHandle.set(o, reader.readInt64(name));
                         }
                     }
 
@@ -256,7 +271,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
                     @Override
                     public void read(CompactReader reader, Schema schema, Object o) throws Exception {
                         if (isFieldExist(schema, name, FLOAT32, NULLABLE_FLOAT32)) {
-                            field.setFloat(o, reader.readFloat32(name));
+                            varHandle.set(o, reader.readFloat32(name));
                         }
                     }
 
@@ -270,7 +285,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
                     @Override
                     public void read(CompactReader reader, Schema schema, Object o) throws Exception {
                         if (isFieldExist(schema, name, FLOAT64, NULLABLE_FLOAT64)) {
-                            field.setDouble(o, reader.readFloat64(name));
+                            varHandle.set(o, reader.readFloat64(name));
                         }
                     }
 
@@ -284,7 +299,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
                     @Override
                     public void read(CompactReader reader, Schema schema, Object o) throws Exception {
                         if (isFieldExist(schema, name, BOOLEAN, NULLABLE_BOOLEAN)) {
-                            field.setBoolean(o, reader.readBoolean(name));
+                            varHandle.set(o, reader.readBoolean(name));
                         }
                     }
 
@@ -298,7 +313,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
                 readerWriters[index] = new ReaderWriterAdapter(
                         ValueReaderWriters.readerWriterFor(compactStreamSerializer, clazz, type,
                                 field.getGenericType(), name),
-                        field
+                        field, varHandle
                 );
             }
 
@@ -312,21 +327,30 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
 
         private final ValueReaderWriter readerWriter;
         private final Field field;
+        private final VarHandle varHandle;
 
 
-        ReaderWriterAdapter(ValueReaderWriter readerWriter, Field field) {
+        ReaderWriterAdapter(ValueReaderWriter readerWriter, Field field, VarHandle varHandle) {
             this.readerWriter = readerWriter;
             this.field = field;
+            this.varHandle = varHandle;
         }
 
         @Override
         public void read(CompactReader reader, Schema schema, Object o) throws Exception {
-            field.set(o, readerWriter.read(reader, schema));
+            final Object val = readerWriter.read(reader, schema);
+
+            if (Modifier.isFinal(field.getModifiers())) {
+                // Somehow, reflection allows you to set final fields... some of the time
+                field.set(o, val);
+            } else {
+                varHandle.set(o, val);
+            }
         }
 
         @Override
         public void write(CompactWriter writer, Object o) throws Exception {
-            readerWriter.write(writer, field.get(o));
+            readerWriter.write(writer, varHandle.get(o));
         }
     }
 
