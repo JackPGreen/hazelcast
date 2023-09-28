@@ -207,7 +207,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
 
                     @Override
                     public void write(CompactWriter writer, Object o) throws Exception {
-                        writer.writeInt8(name, field.getByte(o));
+                        writer.writeInt8(name, (byte) varHandle.get(o));
                     }
                 };
             } else if (Character.TYPE.equals(type)) {
@@ -221,7 +221,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
 
                     @Override
                     public void write(CompactWriter writer, Object o) throws Exception {
-                        writer.writeInt16(name, (short) field.getChar(o));
+                        writer.writeInt16(name, (short) varHandle.get(o));
                     }
                 };
             } else if (Short.TYPE.equals(type)) {
@@ -235,7 +235,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
 
                     @Override
                     public void write(CompactWriter writer, Object o) throws Exception {
-                        writer.writeInt16(name, field.getShort(o));
+                        writer.writeInt16(name, (short) varHandle.get(o));
                     }
                 };
             } else if (Integer.TYPE.equals(type)) {
@@ -243,13 +243,13 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
                     @Override
                     public void read(CompactReader reader, Schema schema, Object o) throws Exception {
                         if (isFieldExist(schema, name, INT32, NULLABLE_INT32)) {
-                            varHandle.set(o, reader.readInt32(name));
+                            varHandle.set(o, varHandle.get(name));
                         }
                     }
 
                     @Override
                     public void write(CompactWriter writer, Object o) throws Exception {
-                        writer.writeInt32(name, field.getInt(o));
+                        writer.writeInt32(name, (int) varHandle.get(o));
                     }
                 };
             } else if (Long.TYPE.equals(type)) {
@@ -263,7 +263,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
 
                     @Override
                     public void write(CompactWriter writer, Object o) throws Exception {
-                        writer.writeInt64(name, field.getLong(o));
+                        writer.writeInt64(name, (long) varHandle.get(o));
                     }
                 };
             } else if (Float.TYPE.equals(type)) {
@@ -277,7 +277,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
 
                     @Override
                     public void write(CompactWriter writer, Object o) throws Exception {
-                        writer.writeFloat32(name, field.getFloat(o));
+                        writer.writeFloat32(name, (float) varHandle.get(o));
                     }
                 };
             } else if (Double.TYPE.equals(type)) {
@@ -291,7 +291,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
 
                     @Override
                     public void write(CompactWriter writer, Object o) throws Exception {
-                        writer.writeFloat64(name, field.getDouble(o));
+                        writer.writeFloat64(name, (double) varHandle.get(o));
                     }
                 };
             } else if (Boolean.TYPE.equals(type)) {
@@ -305,7 +305,7 @@ public class ReflectiveCompactSerializer<T> implements CompactSerializer<T> {
 
                     @Override
                     public void write(CompactWriter writer, Object o) throws Exception {
-                        writer.writeBoolean(name, field.getBoolean(o));
+                        writer.writeBoolean(name, (boolean) varHandle.get(o));
                     }
                 };
             } else {
