@@ -488,6 +488,11 @@
             <groupId>com.fasterxml.jackson.jr</groupId>
             <artifactId>jackson-jr-annotation-support</artifactId>
         </dependency>
+		<dependency>
+			<groupId>com.github.LanternPowered</groupId>
+			<artifactId>Lmbda</artifactId>
+			<version>d1ffaabac3244551a7b65e6130d9ab2e8a21fc54</version>
+		</dependency>
         <dependency>
             <groupId>org.snakeyaml</groupId>
             <artifactId>snakeyaml-engine</artifactId>
