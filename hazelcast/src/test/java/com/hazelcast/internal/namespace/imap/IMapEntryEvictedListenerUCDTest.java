@@ -20,8 +20,7 @@ public class IMapEntryEvictedListenerUCDTest extends IMapEntryListenerUCDTest {
     @Override
     public void test() throws Exception {
         populate();
-        map.evict(1);
 
-        assertListenerFired("entryEvicted");
+        assertListenerFired(()-> map.evict(1),"entryEvicted");
     }
 }

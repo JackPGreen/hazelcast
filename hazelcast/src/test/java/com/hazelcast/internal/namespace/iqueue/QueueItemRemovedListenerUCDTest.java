@@ -20,7 +20,6 @@ public class QueueItemRemovedListenerUCDTest extends QueueListenerUCDTest {
     @Override
     public void test() throws Exception {
         queue.add("item");
-        queue.remove("item");
-        assertListenerFired("itemRemoved");
+        assertListenerFired(() -> queue.remove("item"), "itemRemoved");
     }
 }

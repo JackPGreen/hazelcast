@@ -19,7 +19,6 @@ package com.hazelcast.internal.namespace.imap;
 public class IMapEntryAddedUCDTest extends IMapEntryListenerUCDTest {
     @Override
     public void test() throws Exception {
-        populate();
-        assertListenerFired("entryAdded");
+        assertListenerFired(this::populate, "entryAdded");
     }
 }

@@ -20,7 +20,6 @@ public class IMapMapClearedUCDTest extends IMapEntryListenerUCDTest {
     @Override
     public void test() throws Exception {
         populate();
-        map.clear();
-        assertListenerFired("mapCleared");
+        assertListenerFired(() -> map.clear(), "mapCleared");
     }
 }

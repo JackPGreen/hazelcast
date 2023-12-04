@@ -28,15 +28,16 @@ public class ICachePartitionLostListenerUCDTest extends ICacheUCDTest {
     @Override
     public void test() throws Exception {
         CachePartitionLostListener classInstance = getClassInstance();
-        cache.addPartitionLostListener(classInstance);
 
-        // Fire a fake partition lost event
-        NodeEngineImpl nodeEngine = getNodeEngineImpl(member);
-        InternalPartitionServiceImpl partitionService = (InternalPartitionServiceImpl) nodeEngine.getPartitionService();
-        PartitionEventManager eventManager = partitionService.getPartitionEventManager();
-        eventManager.sendPartitionLostEvent(1, InternalPartition.MAX_BACKUP_COUNT);
+        assertListenerFired(() -> {
+            cache.addPartitionLostListener(classInstance);
 
-        assertListenerFired("partitionLost");
+            // Fire a fake partition lost event
+            NodeEngineImpl nodeEngine = getNodeEngineImpl(member);
+            InternalPartitionServiceImpl partitionService = (InternalPartitionServiceImpl) nodeEngine.getPartitionService();
+            PartitionEventManager eventManager = partitionService.getPartitionEventManager();
+            eventManager.sendPartitionLostEvent(1, InternalPartition.MAX_BACKUP_COUNT);
+        }, "partitionLost");
     }
 
     @Override

@@ -20,7 +20,6 @@ public class ListItemRemovedListenerUCDTest extends ListListenerUCDTest {
     @Override
     public void test() throws Exception {
         populate();
-        list.remove("item");
-        assertListenerFired("itemRemoved");
+        assertListenerFired(() -> list.remove("item"), "itemRemoved");
     }
 }

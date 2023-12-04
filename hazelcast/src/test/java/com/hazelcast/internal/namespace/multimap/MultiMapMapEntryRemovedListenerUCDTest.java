@@ -20,8 +20,7 @@ public class MultiMapMapEntryRemovedListenerUCDTest extends MultiMapMapListenerU
     @Override
     public void test() throws Exception {
         map.put(1, 1);
-        map.remove(1);
 
-        assertListenerFired("entryRemoved");
+        assertListenerFired(()->map.remove(1), "entryRemoved");
     }
 }

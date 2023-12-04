@@ -19,8 +19,6 @@ package com.hazelcast.internal.namespace.replicatedmap;
 public class ReplicatedMapEntryAddedUCDTest extends ReplicatedMapListenerUCDTest {
     @Override
     public void test() throws Exception {
-        map.put(1, 1);
-
-        assertListenerFired("entryAdded");
+        assertListenerFired(() -> map.put(1, 1), "entryAdded");
     }
 }

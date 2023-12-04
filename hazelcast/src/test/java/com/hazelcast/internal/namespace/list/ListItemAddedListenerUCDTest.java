@@ -19,7 +19,6 @@ package com.hazelcast.internal.namespace.list;
 public class ListItemAddedListenerUCDTest extends ListListenerUCDTest {
     @Override
     public void test() throws Exception {
-        populate();
-        assertListenerFired("itemAdded");
+        assertListenerFired(this::populate, "itemAdded");
     }
 }

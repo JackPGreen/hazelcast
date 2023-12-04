@@ -20,8 +20,7 @@ public class ReplicatedMapEntryUpdatedUCDTest extends ReplicatedMapListenerUCDTe
     @Override
     public void test() throws Exception {
         map.put(1, 1);
-        map.put(1, 2);
 
-        assertListenerFired("entryUpdated");
+        assertListenerFired(() -> map.put(1, 2), "entryUpdated");
     }
 }

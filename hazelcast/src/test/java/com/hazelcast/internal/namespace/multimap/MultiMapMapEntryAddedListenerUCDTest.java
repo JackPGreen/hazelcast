@@ -19,8 +19,6 @@ package com.hazelcast.internal.namespace.multimap;
 public class MultiMapMapEntryAddedListenerUCDTest extends MultiMapMapListenerUCDTest {
     @Override
     public void test() throws Exception {
-        map.put(1, 1);
-
-        assertListenerFired("entryAdded");
+        assertListenerFired(() -> map.put(1, 1),"entryAdded");
     }
 }

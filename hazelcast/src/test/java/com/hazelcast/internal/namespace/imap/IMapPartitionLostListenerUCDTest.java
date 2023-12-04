@@ -28,15 +28,16 @@ public class IMapPartitionLostListenerUCDTest extends IMapUCDTest {
     @Override
     public void test() throws Exception {
         MapPartitionLostListener classInstance = getClassInstance();
-        map.addPartitionLostListener(classInstance);
 
-        // Fire a fake partition lost event
-        NodeEngineImpl nodeEngine = getNodeEngineImpl(member);
-        InternalPartitionServiceImpl partitionService = (InternalPartitionServiceImpl) nodeEngine.getPartitionService();
-        PartitionEventManager eventManager = partitionService.getPartitionEventManager();
-        eventManager.sendPartitionLostEvent(1, InternalPartition.MAX_BACKUP_COUNT);
+        assertListenerFired(() -> {
+            map.addPartitionLostListener(classInstance);
 
-        assertListenerFired("partitionLost");
+            // Fire a fake partition lost event
+            NodeEngineImpl nodeEngine = getNodeEngineImpl(member);
+            InternalPartitionServiceImpl partitionService = (InternalPartitionServiceImpl) nodeEngine.getPartitionService();
+            PartitionEventManager eventManager = partitionService.getPartitionEventManager();
+            eventManager.sendPartitionLostEvent(1, InternalPartition.MAX_BACKUP_COUNT);
+        }, "partitionLost");
     }
 
     @Override

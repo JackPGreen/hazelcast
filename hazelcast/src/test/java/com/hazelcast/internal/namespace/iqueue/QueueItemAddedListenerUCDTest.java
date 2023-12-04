@@ -19,7 +19,6 @@ package com.hazelcast.internal.namespace.iqueue;
 public class QueueItemAddedListenerUCDTest extends QueueListenerUCDTest {
     @Override
     public void test() throws Exception {
-        queue.add("item");
-        assertListenerFired("itemAdded");
+        assertListenerFired(() -> queue.add("item"), "itemAdded");
     }
 }

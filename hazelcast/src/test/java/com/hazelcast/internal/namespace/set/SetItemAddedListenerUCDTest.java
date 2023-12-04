@@ -19,7 +19,6 @@ package com.hazelcast.internal.namespace.set;
 public class SetItemAddedListenerUCDTest extends SetListenerUCDTest {
     @Override
     public void test() throws Exception {
-        populate();
-        assertListenerFired("itemAdded");
+        assertListenerFired(this::populate, "itemAdded");
     }
 }

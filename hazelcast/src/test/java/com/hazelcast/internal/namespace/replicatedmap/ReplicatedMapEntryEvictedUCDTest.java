@@ -21,8 +21,6 @@ import java.util.concurrent.TimeUnit;
 public class ReplicatedMapEntryEvictedUCDTest extends ReplicatedMapListenerUCDTest {
     @Override
     public void test() throws Exception {
-        map.put(1, 1, 1, TimeUnit.MILLISECONDS);
-
-        assertListenerFired("entryEvicted");
+        assertListenerFired(() -> map.put(1, 1, 1, TimeUnit.MILLISECONDS), "entryEvicted");
     }
 }

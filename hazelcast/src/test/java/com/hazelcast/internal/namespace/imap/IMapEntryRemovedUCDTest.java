@@ -20,7 +20,7 @@ public class IMapEntryRemovedUCDTest extends IMapEntryListenerUCDTest {
     @Override
     public void test() throws Exception {
         populate();
-        map.remove(1);
-        assertListenerFired("entryRemoved");
+        assertListenerFired(() -> 
+        map.remove(1), "entryRemoved");
     }
 }

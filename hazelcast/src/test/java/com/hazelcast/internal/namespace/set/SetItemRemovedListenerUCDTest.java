@@ -20,7 +20,6 @@ public class SetItemRemovedListenerUCDTest extends SetListenerUCDTest {
     @Override
     public void test() throws Exception {
         populate();
-        set.remove("item");
-        assertListenerFired("itemRemoved");
+        assertListenerFired(() -> set.remove("item"), "itemRemoved");
     }
 }

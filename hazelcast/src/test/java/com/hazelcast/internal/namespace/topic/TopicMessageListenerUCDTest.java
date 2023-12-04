@@ -22,9 +22,7 @@ import org.junit.runners.Parameterized;
 public class TopicMessageListenerUCDTest extends TopicUCDTest {
     @Override
     public void test() throws Exception {
-        topic.publish(Byte.MIN_VALUE);
-
-        assertListenerFired("onMessage");
+        assertListenerFired(() -> topic.publish(Byte.MIN_VALUE), "onMessage");
     }
 
     @Override

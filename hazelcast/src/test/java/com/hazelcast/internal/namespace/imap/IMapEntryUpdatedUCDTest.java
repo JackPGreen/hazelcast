@@ -20,7 +20,6 @@ public class IMapEntryUpdatedUCDTest extends IMapEntryListenerUCDTest {
     @Override
     public void test() throws Exception {
         populate();
-        map.set(1, 2);
-        assertListenerFired("entryUpdated");
+        assertListenerFired(() -> map.set(1, 2), "entryUpdated");
     }
 }

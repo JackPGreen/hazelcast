@@ -21,13 +21,13 @@ import java.util.concurrent.TimeUnit;
 public class IMapEntryExpiredUCDTest extends IMapEntryListenerUCDTest {
     @Override
     public void test() throws Exception {
-        Object KEY = 1;
+        assertListenerFired(() -> {
+            Object KEY = 1;
 
-        map.set(KEY, 1, 1, TimeUnit.MILLISECONDS);
-        // A get forces the expiration to be checked, significantly improving performance in this use-case
-        // https://github.com/hazelcast/hazelcast/issues/6118#issuecomment-145116770
-        map.get(KEY);
-
-        assertListenerFired("entryExpired");
+            map.set(KEY, 1, 1, TimeUnit.MILLISECONDS);
+            // A get forces the expiration to be checked, significantly improving performance in this use-case
+            // https://github.com/hazelcast/hazelcast/issues/6118#issuecomment-145116770
+            map.get(KEY);
+        }, "entryExpired");
     }
 }

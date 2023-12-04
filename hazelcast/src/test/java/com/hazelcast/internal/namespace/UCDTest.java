@@ -18,6 +18,8 @@ package com.hazelcast.internal.namespace;
 
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.test.TestHazelcastFactory;
+import com.hazelcast.collection.ItemEvent;
+import com.hazelcast.collection.ItemListener;
 import com.hazelcast.config.Config;
 import com.hazelcast.config.ConfigXmlGenerator;
 import com.hazelcast.config.EntryListenerConfig;
@@ -33,7 +35,6 @@ import com.hazelcast.map.IMap;
 import com.hazelcast.map.listener.MapListener;
 import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
 import com.hazelcast.spi.impl.NodeEngine;
-import com.hazelcast.test.AssertTask;
 import com.hazelcast.test.HazelcastParametrizedRunner;
 import com.hazelcast.test.HazelcastTestSupport;
 import com.hazelcast.test.annotation.NamespaceTest;
@@ -45,14 +46,15 @@ import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
+import org.testcontainers.shaded.com.google.common.base.Objects;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -71,7 +73,6 @@ import static com.hazelcast.internal.namespace.UCDTest.ConnectionStyle.MEMBER_TO
 import static com.hazelcast.test.Accessors.getNodeEngineImpl;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 /**
  * @see <a href="https://hazelcast.atlassian.net/browse/HZ-3597">HZ-3597 - Add unit tests for all @NamespacesSupported UDF
@@ -355,22 +356,33 @@ public abstract class UCDTest extends HazelcastTestSupport {
      * </ul>
      * </ol>
      * <p>
-     * To check for this firing, we can {@link #assertTrueEventually(AssertTask)} a corresponding entry exists.
+     * To check for this firing, we register a listener and block and wait until a corresponding entry exists.
      * <p>
      * If this was documented in the class itself, it would get lost during compilation
      *
+     * @param actionThatFiresListener the action that will cause the listener to be fired (e.g. {@link IMap#put})
      * @param key the name of the method in the listener that should've fired
      */
-    protected void assertListenerFired(String key) throws ReflectiveOperationException {
-        Collection<String> result = instance.getSet(getClassObject().getSimpleName());
+    protected void assertListenerFired(Runnable actionThatFiresListener, String key) throws Exception {
+        CountDownLatch latch = new CountDownLatch(1);
 
-        assertTrueEventually(() -> {
-            if (LOGGER.isFinestEnabled()) {
-                LOGGER.finest("Checking map for values, currently contains %s", result);
+        instance.getSet(getClassObject().getSimpleName()).addItemListener(new ItemListener<>() {
+            @Override
+            public void itemAdded(ItemEvent<Object> item) {
+                if (Objects.equal(key, item.getItem())) {
+                    latch.countDown();
+                } else {
+                    LOGGER.finest("Found non-relevant listener result -  %s", item.getItem());
+                }
             }
 
-            assertTrue(result.contains(key));
-        });
+            @Override
+            public void itemRemoved(ItemEvent<Object> item) {
+            }
+        }, true);
+
+        actionThatFiresListener.run();
+        latch.await();
     }
 
     protected enum ConnectionStyle {
@@ -507,3 +519,4 @@ public abstract class UCDTest extends HazelcastTestSupport {
                                    .collect(Collectors.toList());
     }
 }
+

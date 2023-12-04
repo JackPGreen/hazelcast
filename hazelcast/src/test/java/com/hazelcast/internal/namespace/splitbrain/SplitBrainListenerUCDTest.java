@@ -46,14 +46,14 @@ public class SplitBrainListenerUCDTest extends UCDTest {
 
     @Override
     public void test() throws Exception {
-        // Fire a fake split brain protection event
-        NodeEngineImpl nodeEngine = getNodeEngineImpl(member);
-        SplitBrainProtectionEvent splitBrainProtectionEvent = new SplitBrainProtectionEvent(nodeEngine.getThisAddress(),
-                2, Collections.emptyList(), false);
-        nodeEngine.getEventService().publishEvent(SplitBrainProtectionServiceImpl.SERVICE_NAME, "my_sbp",
-                splitBrainProtectionEvent, splitBrainProtectionEvent.hashCode());
-
-        assertListenerFired("onChange");
+        assertListenerFired(() -> {
+            // Fire a fake split brain protection event
+            NodeEngineImpl nodeEngine = getNodeEngineImpl(member);
+            SplitBrainProtectionEvent splitBrainProtectionEvent =
+                    new SplitBrainProtectionEvent(nodeEngine.getThisAddress(), 2, Collections.emptyList(), false);
+            nodeEngine.getEventService().publishEvent(SplitBrainProtectionServiceImpl.SERVICE_NAME, "my_sbp",
+                    splitBrainProtectionEvent, splitBrainProtectionEvent.hashCode());
+        }, "onChange");
     }
 
     @Override
@@ -87,9 +87,7 @@ public class SplitBrainListenerUCDTest extends UCDTest {
     @Parameterized.Parameters(name = "Connection: {0}, Config: {1}, Class Registration: {2}, Assertion: {3}")
     public static Iterable<Object[]> parameters() {
         // Dynamic configuration for SplitBrainProtectionListeners is not supported
-        return listenerParametersWithoutInstanceInDataStructure()
-                .stream()
-                .filter(obj -> obj[1] != ConfigStyle.DYNAMIC)
+        return listenerParametersWithoutInstanceInDataStructure().stream().filter(obj -> obj[1] != ConfigStyle.DYNAMIC)
                 .collect(Collectors.toList());
     }
 }
