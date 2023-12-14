@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.ref.WeakReference;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
@@ -35,6 +36,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.zip.InflaterInputStream;
 
@@ -77,6 +79,7 @@ public class MapResourceClassLoader extends JetDelegatingClassLoader {
     protected volatile boolean isShutdown;
     private final ILogger logger = Logger.getLogger(getClass());
     private final @Nullable String namespace;
+    private final Map<String, WeakReference<Class<?>>> classCache = new ConcurrentHashMap<>();
 
     static {
         ClassLoader.registerAsParallelCapable();
@@ -107,36 +110,51 @@ public class MapResourceClassLoader extends JetDelegatingClassLoader {
         return namespace;
     }
 
+    @SuppressWarnings("java:S3776")
     @Override
     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
         if (!childFirst) {
             return super.loadClass(name, resolve);
-        }
-        synchronized (getClassLoadingLock(name)) {
-            Class<?> klass = findLoadedClass(name);
-            // first lookup class in own resources
-            try {
-                if (klass == null) {
-                    klass = findClass(name);
+        } else {
+            WeakReference<Class<?>> cachedKlass = classCache.computeIfAbsent(name, key -> {
+                synchronized (getClassLoadingLock(key)) {
+                    Class<?> klass = findLoadedClass(key);
+
+                    // first lookup class in own resources
+                    try {
+                        if (klass == null) {
+                            klass = findClass(key);
+                        }
+                    } catch (ClassNotFoundException ignored) {
+                        if (logger.isFinestEnabled()) {
+                            logger.finest(ignored);
+                        }
+                    }
+
+                    if (klass == null && getParent() != null) {
+                        try {
+                            klass = getParent().loadClass(key);
+                        } catch (ClassNotFoundException ignored) {
+                            if (logger.isFinestEnabled()) {
+                                logger.finest(ignored);
+                            }
+                        }
+                    }
+
+                    return new WeakReference<>(klass);
                 }
-            } catch (ClassNotFoundException ignored) {
-                if (logger.isFinestEnabled()) {
-                    logger.finest(ignored);
+            });
+
+            if (cachedKlass == null) {
+                throw new ClassNotFoundException(name);
+            } else {
+                if (resolve) {
+                    resolveClass(cachedKlass.get());
                 }
+
+                return cachedKlass.get();
             }
-            if (klass == null && getParent() != null) {
-                try {
-                    klass = getParent().loadClass(name);
-                } catch (ClassNotFoundException ex) {
-                    throw newClassNotFoundException(name);
-                }
-            }
-            if (resolve) {
-                resolveClass(klass);
-            }
-            return klass;
-        }
-    }
+        }}
 
     /**
      * Loads the passed {@link Class} freshly from this {@link ClassLoader}, meaning that the
