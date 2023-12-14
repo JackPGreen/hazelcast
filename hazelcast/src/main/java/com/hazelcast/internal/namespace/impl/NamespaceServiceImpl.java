@@ -340,6 +340,7 @@ public final class NamespaceServiceImpl implements NamespaceService {
     }
 
     private static void cleanUpClassLoader(String nsName, MapResourceClassLoader removedClassLoader) {
+        ClassLoaderUtil.deregisterClassLoader(removedClassLoader);
         NamespaceAwareDriverManagerInterface.cleanupJdbcDrivers(nsName, removedClassLoader);
     }
 

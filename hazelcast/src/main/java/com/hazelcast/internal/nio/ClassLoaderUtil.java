@@ -446,9 +446,8 @@ public final class ClassLoaderUtil {
 
     private static boolean shouldBypassCache(Class<?> clazz) {
         // dynamically loaded class should not be cached here, as they are already
-        // cached in the DistributedLoadingService (when cache is enabled)
-        return (clazz.getClassLoader() instanceof ClassSource
-                || clazz.getClassLoader() instanceof MapResourceClassLoader);
+        // cached in the UserCodeDeploymentService#locator (when cache is enabled)
+        return (clazz.getClassLoader() instanceof ClassSource);
     }
 
     private static final class IrresolvableConstructor {
@@ -465,5 +464,10 @@ public final class ClassLoaderUtil {
     public static String extractClassName(String filePath) {
         Matcher matcher = CLASS_PATTERN.matcher(filePath.replace('/', '.'));
         return matcher.matches() ? matcher.group(1) : null;
+    }
+
+    public static void deregisterClassLoader(ClassLoader removedClassLoader) {
+        CLASS_CACHE.cache.remove(removedClassLoader);
+        CONSTRUCTOR_CACHE.cache.remove(removedClassLoader);
     }
 }
